@@ -41,4 +41,4 @@ dependencies:
   - wheel=0.37.1=pyhd3eb1b0_0
   - win_inet_pton=1.1.0=py39haa95532_0
   - wincertstore=0.2=py39haa95532_2
-prefix: C:\Users\n515625\Anaconda3\envs\bar_env
+prefix: C:\Users\Anaconda3\envs\bar_env
