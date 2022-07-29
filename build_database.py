@@ -144,7 +144,7 @@ global_df['drink'] = global_df['drink'].map(lambda x: x.upper())
 global_df['bar'] = global_df['bar'].map(lambda x: x.upper())
 global_df['price'] = global_df['price'].astype(float)
 
-# get drinks to query API with
+# get drinks to query API
 master_drinks = list(set((london_df.drink.unique().tolist())
                          + (new_york_df.drink.unique().tolist())
                          + (budapest_df.drink.unique().tolist())))
