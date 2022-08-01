@@ -111,10 +111,9 @@ bar_stock_df = pd.read_csv('data/bar_data.csv'
 # minor cleaning
 bar_stock_df = bar_stock_df.reset_index().rename\
     (columns={'index': 'stockID', 'glass_type': 'glassType'}).set_index('stockID')
-bar_stock_df['glassType'] = bar_stock_df['glassType'].map(lambda x: x.upper())
-bar_stock_df['bar'] = bar_stock_df['bar'].map(lambda x: x.upper())
 bar_stock_df['stock'] = bar_stock_df['stock'].str.extract('(\d+)', expand=False)
 bar_stock_df['stock'] = bar_stock_df['stock'].astype(int)
+bar_stock_df = bar_stock_df.applymap(lambda s: s.lower() if type(s) == str else s)
 
 # set column names
 col_names = ['dateOfSale', 'drink', 'price']
@@ -156,7 +155,8 @@ ny_max_date = str(new_york_df.dateOfSale.max())
 f = open('last_update.txt', 'w')
 f.write(f"NYC_date_max {ny_max_date}\nLON_date_max {london_max_date}\nBUDA_date_max {budapest_max_date}\n")
 date_dict = {}
-f =  open("last_update.txt")
+f = open("last_update.txt")
+
 for line in f:
     k, v = line.split(' ', 1)
     v = v[:-1]
@@ -167,9 +167,8 @@ f.close
 global_df = pd.concat([budapest_df, london_df, new_york_df], ignore_index=True)
 # minor cleaning
 global_df = global_df.reset_index().rename(columns={'index': 'saleID'}).set_index('saleID')
-global_df['drink'] = global_df['drink'].map(lambda x: x.upper())
-global_df['bar'] = global_df['bar'].map(lambda x: x.upper())
 global_df['price'] = global_df['price'].astype(float)
+global_df = global_df.applymap(lambda s: s.lower() if type(s) == str else s)
 
 # get drinks to query API
 master_drinks = list(set((london_df.drink.unique().tolist())
@@ -192,10 +191,11 @@ for drink in master_drinks:
 # combine dfs
 cocktails_df = pd.concat(dfs, ignore_index=True)
 # minor cleaning
-cocktails_df = cocktails_df.drop_duplicates()
-#cocktails_df = cocktails_df.reset_index().rename(columns={'index': 'cocktailID'}).set_index('cocktailID')
-cocktails_df['strDrink'] = cocktails_df['strDrink'].map(lambda x: x.upper())
-cocktails_df['strGlass'] = cocktails_df['strGlass'].map(lambda x: x.upper())
+cocktails_df = cocktails_df.sort_values(by='dateModified',ascending=False)
+cocktails_df['dateModified'] = pd.to_datetime(cocktails_df['dateModified'], infer_datetime_format=True)
+cocktails_df = cocktails_df.drop_duplicates(subset=['idDrink', 'strDrink', 'strCategory',
+                                                    'strIBA', 'strAlcoholic', 'strGlass'], keep='first')
+cocktails_df = cocktails_df.applymap(lambda s: s.lower() if type(s) == str else s)
 
 # execute sql script to create tables
 execute_external_sql_script_file('data_tables.sql', 'bar_db')
