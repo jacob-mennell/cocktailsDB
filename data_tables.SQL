@@ -3,7 +3,7 @@
 
 -- create bar stock table
 CREATE TABLE bar_stock(
-stockID integer  PRIMARY KEY,
+stockID integer  PRIMARY KEY NOT NULL,
 glassType CHAR(50),
 stock int,
 bar CHAR(50)
@@ -12,7 +12,7 @@ bar CHAR(50)
 
 -- create global sales tables from New York, London, Budapest data
 CREATE TABLE global_sales(
-saleID integer  PRIMARY KEY,
+saleID integer  PRIMARY KEY NOT NULL,
 dateOfSale timestamp,
 drink CHAR(50),
 price float,
@@ -21,7 +21,7 @@ bar CHAR(50)
 
 -- create cocktails table from cocktails API data
 CREATE TABLE cocktails(
-idDrink integer PRIMARY KEY,
+idDrink integer PRIMARY KEY NOT NULL,
 strDrink CHAR(50),
 strCategory CHAR(50),
 strIBA CHAR(50),
