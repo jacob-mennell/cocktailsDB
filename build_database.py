@@ -58,10 +58,9 @@ def execute_sql_script(sql_script_string, db_name):
         logging.error("SQL script failed to execute", e)
 
 
-# This function will read the sql script text from the external sql file and then run the sql script text.
 def execute_external_sql_script_file(script_file_path, db_name):
     """
-    Function opens external file and inputs that into hte execute_sql_script function.
+    Function opens external file and inputs that into the execute_sql_script function to run the query.
 
     :param script_file_path:
     :param db_name:
@@ -95,7 +94,7 @@ file_handler_format = '%(asctime)s | %(levelname)s | %(lineno)d: %(message)s'
 file_handler.setFormatter(logging.Formatter(file_handler_format))
 logger.addHandler(file_handler)
 
-# create dicts of dates from text file for df filtering
+# create dicts of dates from text file for date filtering prior to upload
 date_dict = {}
 with open("last_update.txt") as f:
     for line in f:
@@ -115,7 +114,7 @@ bar_stock_df['stock'] = bar_stock_df['stock'].str.extract('(\d+)', expand=False)
 bar_stock_df['stock'] = bar_stock_df['stock'].astype(int)
 bar_stock_df = bar_stock_df.applymap(lambda s: s.lower() if type(s) == str else s)
 
-# set column names
+# set global df column names
 col_names = ['dateOfSale', 'drink', 'price']
 
 # import budapest data
@@ -156,7 +155,6 @@ f = open('last_update.txt', 'w')
 f.write(f"NYC_date_max {ny_max_date}\nLON_date_max {london_max_date}\nBUDA_date_max {budapest_max_date}\n")
 date_dict = {}
 f = open("last_update.txt")
-
 for line in f:
     k, v = line.split(' ', 1)
     v = v[:-1]
