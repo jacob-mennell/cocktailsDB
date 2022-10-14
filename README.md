@@ -1,4 +1,4 @@
-# Analytics-engineering Project
+# Cocktails Analytics Engineering Project
 
 ### Client
 The client is the owner of a high-end chain of bars. Recently they've experienced complaints about the time it's taken staff to deliver their drinks after they've been ordered.
