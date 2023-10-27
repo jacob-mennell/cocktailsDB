@@ -102,7 +102,6 @@ if __name__ == "__main__":
             k, v = line.split(" ", 1)
             v = v[:-1]
             date_dict[k] = v
-    f.close
 
     # import bar data
     bar_stock_df = pd.read_csv("data/bar_data.csv", header=0, sep=",")
@@ -161,17 +160,17 @@ if __name__ == "__main__":
     ny_max_date = str(new_york_df.dateOfSale.max())
 
     # set new dates to limit size of future uploads
-    f = open("last_update.txt", "w")
-    f.write(
-        f"NYC_date_max {ny_max_date}\nLON_date_max {london_max_date}\nBUDA_date_max {budapest_max_date}\n"
-    )
+    with open("last_update.txt", "w") as f:
+        f.write(
+            f"NYC_date_max {ny_max_date}\nLON_date_max {london_max_date}\nBUDA_date_max {budapest_max_date}\n"
+        )
+    
     date_dict = {}
-    f = open("last_update.txt")
-    for line in f:
-        k, v = line.split(" ", 1)
-        v = v[:-1]
-        date_dict[k] = v
-    f.close
+    with open("last_update.txt") as f:
+        for line in f:
+            k, v = line.split(" ", 1)
+            v = v[:-1]
+            date_dict[k] = v
 
     # concat dataframes
     global_df = pd.concat([budapest_df, london_df, new_york_df], ignore_index=True)
