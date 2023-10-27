@@ -209,8 +209,8 @@ if __name__ == "__main__":
         ]
         # append data
         dfs.append(df)
-        # print output to see status
-        print(f"Current loop number: {counter} out of {len(master_drinks)}")
+        # logging.info output to see status
+        logging.info(f"Current loop number: {counter} out of {len(master_drinks)}")
         counter += 1
 
     # combine dfs
