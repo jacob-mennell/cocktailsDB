@@ -93,7 +93,7 @@ def create_tables(db_name):
     :param db_name:
     :return: nothing
     """
-    execute_external_sql_script_file("create_tables.sql", db_name)
+    execute_external_sql_script_file("data_tables.sql", db_name)
 
 
 def insert_data(df, table_name, db_name):
