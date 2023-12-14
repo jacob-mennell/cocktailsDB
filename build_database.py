@@ -2,12 +2,30 @@ import gzip
 import pandas as pd
 import requests
 import logging
-import time
 import sqlite3
 import datetime
 
 
-# functions
+# Set up logging
+logger = logging.getLogger()
+logger.setLevel(logging.NOTSET)
+
+# Return error and critical logs to console
+console = logging.StreamHandler()
+console.setLevel(logging.ERROR)
+console_format = "%(asctime)s | %(levelname)s: %(message)s"
+console.setFormatter(logging.Formatter(console_format))
+logger.addHandler(console)
+
+# Create log file to capture all logging
+file_handler = logging.FileHandler("drinks_db.log")
+file_handler.setLevel(logging.INFO)
+file_handler_format = "%(asctime)s | %(levelname)s | %(lineno)d: %(message)s"
+file_handler.setFormatter(logging.Formatter(file_handler_format))
+logger.addHandler(file_handler)
+
+
+# Functions
 def cocktail_extract(drink):
     """
     Function takes a drink and submits a GET request to the cocktaildb API and returns a dataframe.
@@ -16,44 +34,39 @@ def cocktail_extract(drink):
     :return: dataframe
     """
     try:
-        r = requests.request(
-            method="GET",
-            url=f"https://www.thecocktaildb.com/api/json/v1/1/search.php?s={drink}",
-        )
+        url = f"https://www.thecocktaildb.com/api/json/v1/1/search.php?s={drink}"
+        response = requests.get(url)
 
-        # error capture
-        if r.status_code != 200:
-            logging.info(drink, r.status_code)
+        # Error capture
+        if response.status_code != 200:
+            logging.error(
+                f"Error getting cocktail data for {drink}: {response.status_code}"
+            )
+            return pd.DataFrame()
 
-        df = pd.DataFrame(r.json()["drinks"])
+        df = pd.DataFrame(response.json()["drinks"])
 
     except Exception as e:
+        logging.error(f"Error getting cocktail data for {drink}: {e}")
         df = pd.DataFrame()
-        logging.error("Error getting cocktail data", e)
 
     return df
 
 
 def execute_sql_script(sql_script_string, db_name):
     """
-    Function initialises connection to sql db and executes a script on the database.
+    Function initializes connection to SQL database and executes a script on the database.
+
     :param sql_script_string:
     :param db_name:
     :return: nothing
     """
     try:
-        # Connect to sqlite3 database.then run the cursor
-        conn = sqlite3.connect(db_name)
-        cursor = conn.cursor()
-        # Run the sql script string
-        cursor.executescript(sql_script_string)
-        # Commit operation
-        conn.commit()
-        # Close cursor object
-        cursor.close()
-        # Close connection object
-        conn.close()
-        logging.info("Execute sql script complete.")
+        with sqlite3.connect(db_name) as conn:
+            cursor = conn.cursor()
+            cursor.executescript(sql_script_string)
+            conn.commit()
+        logging.info("Execute SQL script complete.")
     except Exception as e:
         logging.error("SQL script failed to execute", e)
 
@@ -66,35 +79,38 @@ def execute_external_sql_script_file(script_file_path, db_name):
     :param db_name:
     :return: nothing
     """
-    # Open the external sql file.
-    file = open(script_file_path, "r")
-    # Read out the sql script text in the file.
-    sql_script_string = file.read()
-    # Close the sql file object.
-    file.close()
-    # Execute the read out sql script string.
+    # Open the external SQL file.
+    with open(script_file_path, "r") as file:
+        sql_script_string = file.read()
+    # Execute the SQL script string.
     execute_sql_script(sql_script_string, db_name)
 
 
+def create_tables(db_name):
+    """
+    Function creates necessary tables in the SQLite database.
+
+    :param db_name:
+    :return: nothing
+    """
+    execute_external_sql_script_file("create_tables.sql", db_name)
+
+
+def insert_data(df, table_name, db_name):
+    """
+    Function inserts data from a DataFrame into a specified table in the SQLite database.
+
+    :param df: DataFrame
+    :param table_name: str
+    :param db_name: str
+    :return: nothing
+    """
+    with sqlite3.connect(db_name) as conn:
+        df.to_sql(table_name, conn, if_exists="append", index=False)
+    logging.info(f"Data inserted into {table_name} table.")
+
+
 if __name__ == "__main__":
-    # initialise log file
-    logger = logging.getLogger()
-    logger.setLevel(logging.NOTSET)
-
-    # return error and critical logs to console
-    console = logging.StreamHandler()
-    console.setLevel(logging.ERROR)
-    console_format = "%(asctime)s | %(levelname)s: %(message)s"
-    console.setFormatter(logging.Formatter(console_format))
-    logger.addHandler(console)
-
-    # create log file to capture all logging
-    file_handler = logging.FileHandler("drinks_db.log")
-    file_handler.setLevel(logging.INFO)
-    file_handler_format = "%(asctime)s | %(levelname)s | %(lineno)d: %(message)s"
-    file_handler.setFormatter(logging.Formatter(file_handler_format))
-    logger.addHandler(file_handler)
-
     # create dicts of dates from text file for date filtering prior to upload
     date_dict = {}
     with open("last_update.txt") as f:
@@ -103,9 +119,10 @@ if __name__ == "__main__":
             v = v[:-1]
             date_dict[k] = v
 
-    # import bar data
+    # Import bar data
     bar_stock_df = pd.read_csv("data/bar_data.csv", header=0, sep=",")
-    # minor cleaning
+
+    # Minor cleaning
     bar_stock_df = (
         bar_stock_df.reset_index()
         .rename(columns={"index": "stockID", "glass_type": "glassType"})
@@ -113,12 +130,14 @@ if __name__ == "__main__":
     )
     bar_stock_df["stock"] = bar_stock_df["stock"].str.extract("(\d+)", expand=False)
     bar_stock_df["stock"] = bar_stock_df["stock"].astype(int)
-    bar_stock_df = bar_stock_df.applymap(lambda s: s.lower() if type(s) == str else s)
+    bar_stock_df = bar_stock_df.applymap(
+        lambda s: s.lower() if isinstance(s, str) else s
+    )
 
-    # set global df column names
+    # Set global df column names
     col_names = ["dateOfSale", "drink", "price"]
 
-    # import budapest data
+    # Import budapest data
     budapest_df = pd.read_csv(
         "data/budapest.csv.gz",
         compression="gzip",
@@ -129,11 +148,11 @@ if __name__ == "__main__":
     )
     budapest_df["bar"] = "budapest"
     budapest_df = budapest_df.loc[
-        budapest_df["dateOfSale"] > date_dict["BUDA_date_max"]
+        budapest_df["dateOfSale"] > date_dict.get("BUDA_date_max", "1900-01-01")
     ]
     budapest_max_date = str(budapest_df.dateOfSale.max())
 
-    # import london data
+    # Import london data
     london_df = pd.read_csv(
         "data/london_transactions.csv.gz",
         compression="gzip",
@@ -143,10 +162,12 @@ if __name__ == "__main__":
         parse_dates=["dateOfSale"],
     )
     london_df["bar"] = "london"
-    london_df = london_df.loc[london_df["dateOfSale"] > date_dict["LON_date_max"]]
+    london_df = london_df.loc[
+        london_df["dateOfSale"] > date_dict.get("LON_date_max", "1900-01-01")
+    ]
     london_max_date = str(london_df.dateOfSale.max())
 
-    # import new york data
+    # Import new york data
     new_york_df = pd.read_csv(
         "data/ny.csv.gz",
         compression="gzip",
@@ -156,45 +177,44 @@ if __name__ == "__main__":
         parse_dates=["dateOfSale"],
     )
     new_york_df["bar"] = "new york"
-    new_york_df = new_york_df.loc[new_york_df["dateOfSale"] > date_dict["NYC_date_max"]]
+    new_york_df = new_york_df.loc[
+        new_york_df["dateOfSale"] > date_dict.get("NYC_date_max", "1900-01-01")
+    ]
     ny_max_date = str(new_york_df.dateOfSale.max())
 
-    # set new dates to limit size of future uploads
+    # Set new dates to limit size of future uploads
+    date_dict.update(
+        {
+            "NYC_date_max": ny_max_date,
+            "LON_date_max": london_max_date,
+            "BUDA_date_max": budapest_max_date,
+        }
+    )
     with open("last_update.txt", "w") as f:
-        f.write(
-            f"NYC_date_max {ny_max_date}\nLON_date_max {london_max_date}\nBUDA_date_max {budapest_max_date}\n"
-        )
-    
-    date_dict = {}
-    with open("last_update.txt") as f:
-        for line in f:
-            k, v = line.split(" ", 1)
-            v = v[:-1]
-            date_dict[k] = v
+        for k, v in date_dict.items():
+            f.write(f"{k} {v}\n")
 
-    # concat dataframes
+    # Concatenate dataframes
     global_df = pd.concat([budapest_df, london_df, new_york_df], ignore_index=True)
-    # minor cleaning
+    # Minor cleaning
     global_df = (
         global_df.reset_index().rename(columns={"index": "saleID"}).set_index("saleID")
     )
     global_df["price"] = global_df["price"].astype(float)
-    global_df = global_df.applymap(lambda s: s.lower() if type(s) == str else s)
+    global_df = global_df.applymap(lambda s: s.lower() if isinstance(s, str) else s)
 
-    # get drinks to query API
+    # Get drinks to query API
     master_drinks = list(
         set(
-            (london_df.drink.unique().tolist())
-            + (new_york_df.drink.unique().tolist())
-            + (budapest_df.drink.unique().tolist())
+            london_df.drink.unique().tolist()
+            + new_york_df.drink.unique().tolist()
+            + budapest_df.drink.unique().tolist()
         )
     )
 
-    # apply cocktail_extract function
-    counter = 1
     dfs = []
-    for drink in master_drinks:
-        # extract data from the offset value
+    for counter, drink in enumerate(master_drinks, start=1):
+        # Extract data from the offset value
         df = cocktail_extract(drink)
         df = df[
             [
@@ -207,19 +227,15 @@ if __name__ == "__main__":
                 "dateModified",
             ]
         ]
-        # append data
+        # Append data
         dfs.append(df)
-        # logging.info output to see status
+        # Logging info output to see status
         logging.info(f"Current loop number: {counter} out of {len(master_drinks)}")
-        counter += 1
-
-    # combine dfs
+    # Combine dataframes
     cocktails_df = pd.concat(dfs, ignore_index=True)
-    # minor cleaning
+    # Minor cleaning
     cocktails_df = cocktails_df.sort_values(by="dateModified", ascending=False)
-    cocktails_df["dateModified"] = pd.to_datetime(
-        cocktails_df["dateModified"], infer_datetime_format=True
-    )
+    cocktails_df["dateModified"] = pd.to_datetime(cocktails_df["dateModified"])
     cocktails_df = cocktails_df.drop_duplicates(
         subset=[
             "idDrink",
@@ -231,27 +247,13 @@ if __name__ == "__main__":
         ],
         keep="first",
     )
-    cocktails_df = cocktails_df.applymap(lambda s: s.lower() if type(s) == str else s)
-
-    # execute sql script to create tables
-    execute_external_sql_script_file("data_tables.sql", "bar_db")
-
-    # populate sql tables
-
-    # Connect to sqlite3 database.
-    conn = sqlite3.connect("bar_db")
-
-    # send each dataframe to sql
-    global_df.to_sql(
-        "global_sales", conn, if_exists="append", index=True, index_label="saleID"
+    cocktails_df = cocktails_df.applymap(
+        lambda s: s.lower() if isinstance(s, str) else s
     )
-    bar_stock_df.to_sql(
-        "bar_stock", conn, if_exists="append", index=True, index_label="stockID"
-    )
-    cocktails_df.to_sql("cocktails", conn, if_exists="append", index=False)
 
-    # Close the connection object.
-    conn.close()
-
-    # Create POC Table for analysis
-    execute_external_sql_script_file("poc_tables.sql", "bar_db")
+    # Create tables and insert data
+    db_name = "bar_db"
+    create_tables(db_name)
+    insert_data(global_df, "global_sales", db_name)
+    insert_data(bar_stock_df, "bar_stock", db_name)
+    insert_data(cocktails_df, "cocktails", db_name)
