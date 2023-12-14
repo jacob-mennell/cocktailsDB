@@ -111,6 +111,7 @@ def insert_data(df, table_name, db_name):
 
 
 if __name__ == "__main__":
+    
     # create dicts of dates from text file for date filtering prior to upload
     date_dict = {}
     with open("last_update.txt") as f:
@@ -231,8 +232,10 @@ if __name__ == "__main__":
         dfs.append(df)
         # Logging info output to see status
         logging.info(f"Current loop number: {counter} out of {len(master_drinks)}")
+    
     # Combine dataframes
     cocktails_df = pd.concat(dfs, ignore_index=True)
+    
     # Minor cleaning
     cocktails_df = cocktails_df.sort_values(by="dateModified", ascending=False)
     cocktails_df["dateModified"] = pd.to_datetime(cocktails_df["dateModified"])
