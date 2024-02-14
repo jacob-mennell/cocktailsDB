@@ -6,33 +6,26 @@ import sqlite3
 import datetime
 
 
-# Set up logging
-logger = logging.getLogger()
-logger.setLevel(logging.NOTSET)
+def setup_logging():
+    logger = logging.getLogger()
+    logger.setLevel(logging.NOTSET)
 
-# Return error and critical logs to console
-console = logging.StreamHandler()
-console.setLevel(logging.ERROR)
-console_format = "%(asctime)s | %(levelname)s: %(message)s"
-console.setFormatter(logging.Formatter(console_format))
-logger.addHandler(console)
+    # Return error and critical logs to console
+    console = logging.StreamHandler()
+    console.setLevel(logging.ERROR)
+    console_format = "%(asctime)s | %(levelname)s: %(message)s"
+    console.setFormatter(logging.Formatter(console_format))
+    logger.addHandler(console)
 
-# Create log file to capture all logging
-file_handler = logging.FileHandler("drinks_db.log")
-file_handler.setLevel(logging.INFO)
-file_handler_format = "%(asctime)s | %(levelname)s | %(lineno)d: %(message)s"
-file_handler.setFormatter(logging.Formatter(file_handler_format))
-logger.addHandler(file_handler)
+    # Create log file to capture all logging
+    file_handler = logging.FileHandler("drinks_db.log")
+    file_handler.setLevel(logging.INFO)
+    file_handler_format = "%(asctime)s | %(levelname)s | %(lineno)d: %(message)s"
+    file_handler.setFormatter(logging.Formatter(file_handler_format))
+    logger.addHandler(file_handler)
 
 
-# Functions
-def cocktail_extract(drink):
-    """
-    Function takes a drink and submits a GET request to the cocktaildb API and returns a dataframe.
-
-    :param drink:
-    :return: dataframe
-    """
+def get_cocktail_data(drink):
     try:
         url = f"https://www.thecocktaildb.com/api/json/v1/1/search.php?s={drink}"
         response = requests.get(url)
@@ -54,13 +47,6 @@ def cocktail_extract(drink):
 
 
 def execute_sql_script(sql_script_string, db_name):
-    """
-    Function initializes connection to SQL database and executes a script on the database.
-
-    :param sql_script_string:
-    :param db_name:
-    :return: nothing
-    """
     try:
         with sqlite3.connect(db_name) as conn:
             cursor = conn.cursor()
@@ -72,54 +58,22 @@ def execute_sql_script(sql_script_string, db_name):
 
 
 def execute_external_sql_script_file(script_file_path, db_name):
-    """
-    Function opens external file and inputs that into the execute_sql_script function to run the query.
-
-    :param script_file_path:
-    :param db_name:
-    :return: nothing
-    """
-    # Open the external SQL file.
     with open(script_file_path, "r") as file:
         sql_script_string = file.read()
-    # Execute the SQL script string.
     execute_sql_script(sql_script_string, db_name)
 
 
 def create_tables(db_name):
-    """
-    Function creates necessary tables in the SQLite database.
-
-    :param db_name:
-    :return: nothing
-    """
     execute_external_sql_script_file("data_tables.sql", db_name)
 
 
-def insert_data(df, table_name, db_name):
-    """
-    Function inserts data from a DataFrame into a specified table in the SQLite database.
-
-    :param df: DataFrame
-    :param table_name: str
-    :param db_name: str
-    :return: nothing
-    """
+def insert_data_into_table(df, table_name, db_name):
     with sqlite3.connect(db_name) as conn:
         df.to_sql(table_name, conn, if_exists="append", index=False)
     logging.info(f"Data inserted into {table_name} table.")
 
 
-if __name__ == "__main__":
-    
-    # create dicts of dates from text file for date filtering prior to upload
-    date_dict = {}
-    with open("last_update.txt") as f:
-        for line in f:
-            k, v = line.split(" ", 1)
-            v = v[:-1]
-            date_dict[k] = v
-
+def process_bar_data():
     # Import bar data
     bar_stock_df = pd.read_csv("data/bar_data.csv", header=0, sep=",")
 
@@ -135,8 +89,17 @@ if __name__ == "__main__":
         lambda s: s.lower() if isinstance(s, str) else s
     )
 
-    # Set global df column names
-    col_names = ["dateOfSale", "drink", "price"]
+    return bar_stock_df
+
+
+def process_sales_data():
+    # create dicts of dates from text file for date filtering prior to upload
+    date_dict = {}
+    with open("last_update.txt") as f:
+        for line in f:
+            k, v = line.split(" ", 1)
+            v = v[:-1]
+            date_dict[k] = v
 
     # Import budapest data
     budapest_df = pd.read_csv(
@@ -183,7 +146,7 @@ if __name__ == "__main__":
     ]
     ny_max_date = str(new_york_df.dateOfSale.max())
 
-    # Set new dates to limit size of future uploads
+    # Set new dates to limit the size of future uploads
     date_dict.update(
         {
             "NYC_date_max": ny_max_date,
@@ -204,6 +167,10 @@ if __name__ == "__main__":
     global_df["price"] = global_df["price"].astype(float)
     global_df = global_df.applymap(lambda s: s.lower() if isinstance(s, str) else s)
 
+    return global_df
+
+
+def query_cocktail_data():
     # Get drinks to query API
     master_drinks = list(
         set(
@@ -216,7 +183,7 @@ if __name__ == "__main__":
     dfs = []
     for counter, drink in enumerate(master_drinks, start=1):
         # Extract data from the offset value
-        df = cocktail_extract(drink)
+        df = get_cocktail_data(drink)
         df = df[
             [
                 "idDrink",
@@ -232,10 +199,10 @@ if __name__ == "__main__":
         dfs.append(df)
         # Logging info output to see status
         logging.info(f"Current loop number: {counter} out of {len(master_drinks)}")
-    
+
     # Combine dataframes
     cocktails_df = pd.concat(dfs, ignore_index=True)
-    
+
     # Minor cleaning
     cocktails_df = cocktails_df.sort_values(by="dateModified", ascending=False)
     cocktails_df["dateModified"] = pd.to_datetime(cocktails_df["dateModified"])
@@ -254,9 +221,37 @@ if __name__ == "__main__":
         lambda s: s.lower() if isinstance(s, str) else s
     )
 
-    # Create tables and insert data
+    return cocktails_df
+
+
+def main():
+
+    # Initialize logging
+    setup_logging()
+
+    # Create tables in the SQLite database
     db_name = "bar_db"
     create_tables(db_name)
-    insert_data(global_df, "global_sales", db_name)
-    insert_data(bar_stock_df, "bar_stock", db_name)
-    insert_data(cocktails_df, "cocktails", db_name)
+    logging.info("Tables created in the SQLite database.")
+
+    # Read and process bar data
+    bar_stock_df = process_bar_data()
+    logging.info("Bar data processed successfully.")
+
+    # Read and process sales data
+    global_df = process_sales_data()
+    logging.info("Sales data processed successfully.")
+
+    # Query cocktail data
+    cocktails_df = query_cocktail_data()
+    logging.info("Cocktail data queried successfully.")
+
+    # Insert data into respective tables
+    insert_data_into_table(global_df, "global_sales", db_name)
+    insert_data_into_table(bar_stock_df, "bar_stock", db_name)
+    insert_data_into_table(cocktails_df, "cocktails", db_name)
+    logging.info("Data inserted into respective tables.")
+
+
+if __name__ == "__main__":
+    main()
