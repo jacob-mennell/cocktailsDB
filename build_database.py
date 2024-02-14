@@ -64,7 +64,7 @@ def execute_external_sql_script_file(script_file_path, db_name):
 
 
 def create_tables(db_name):
-    execute_external_sql_script_file("data_tables.sql", db_name)
+    execute_external_sql_script_file("database/data_tables.sql", db_name)
 
 
 def insert_data_into_table(df, table_name, db_name):
@@ -230,7 +230,7 @@ def main():
     setup_logging()
 
     # Create tables in the SQLite database
-    db_name = "bar_db"
+    db_name = "database/bar_db"
     create_tables(db_name)
     logging.info("Tables created in the SQLite database.")
 
