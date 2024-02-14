@@ -6,7 +6,6 @@ import sqlite3
 import datetime
 
 
-# Set up logging
 def setup_logging():
     logger = logging.getLogger()
     logger.setLevel(logging.NOTSET)
@@ -72,6 +71,7 @@ def insert_data_into_table(df, table_name, db_name):
     with sqlite3.connect(db_name) as conn:
         df.to_sql(table_name, conn, if_exists="append", index=False)
     logging.info(f"Data inserted into {table_name} table.")
+
 
 def process_bar_data():
     # Import bar data
@@ -223,27 +223,35 @@ def query_cocktail_data():
 
     return cocktails_df
 
+
 def main():
+
     # Initialize logging
     setup_logging()
 
     # Create tables in the SQLite database
     db_name = "bar_db"
     create_tables(db_name)
+    logging.info("Tables created in the SQLite database.")
 
     # Read and process bar data
     bar_stock_df = process_bar_data()
+    logging.info("Bar data processed successfully.")
 
     # Read and process sales data
     global_df = process_sales_data()
+    logging.info("Sales data processed successfully.")
 
     # Query cocktail data
     cocktails_df = query_cocktail_data()
+    logging.info("Cocktail data queried successfully.")
 
     # Insert data into respective tables
     insert_data_into_table(global_df, "global_sales", db_name)
     insert_data_into_table(bar_stock_df, "bar_stock", db_name)
     insert_data_into_table(cocktails_df, "cocktails", db_name)
+    logging.info("Data inserted into respective tables.")
+
 
 if __name__ == "__main__":
     main()
