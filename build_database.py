@@ -18,7 +18,7 @@ def setup_logging():
     logger.addHandler(console)
 
     # Create log file to capture all logging
-    file_handler = logging.FileHandler("drinks_db.log")
+    file_handler = logging.FileHandler("logs/drinks_db.log")
     file_handler.setLevel(logging.INFO)
     file_handler_format = "%(asctime)s | %(levelname)s | %(lineno)d: %(message)s"
     file_handler.setFormatter(logging.Formatter(file_handler_format))
